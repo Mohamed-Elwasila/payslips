@@ -4,6 +4,7 @@ CLI entry point for the Deliveroo payslip parser.
 Usage:
     python -m src.main parse <path-to-pdf> [<path-to-pdf> ...]
     python -m src.main save <path-to-pdf> [<path-to-pdf> ...]
+    python -m src.main fetch
     python -m src.main summary [year]
 """
 
@@ -151,9 +152,48 @@ def cmd_summary(args: list[str]) -> None:
         session.close()
 
 
+def cmd_fetch(args: list[str]) -> None:
+    """Fetch Deliveroo invoices from Gmail, parse, and save to database."""
+    from src.email_fetcher import fetch_invoices
+    from src.db import get_session, init_db, save_invoice
+
+    output_dir = args[0] if args else None
+    pdfs = fetch_invoices(output_dir=output_dir)
+
+    if not pdfs:
+        return
+
+    init_db()
+    session = get_session()
+
+    try:
+        saved_count = 0
+        skipped_count = 0
+
+        for pdf_path in pdfs:
+            try:
+                invoice = parse_pdf(pdf_path)
+            except ValueError as e:
+                print(f"Skipping: Error parsing {pdf_path}: {e}")
+                continue
+
+            saved = save_invoice(session, invoice)
+            if saved:
+                print(f"Saved: {invoice.serial_number} ({invoice.grand_total:.2f})")
+                saved_count += 1
+            else:
+                print(f"Skipped (duplicate): {invoice.serial_number}")
+                skipped_count += 1
+
+        print(f"\nDone: {saved_count} saved, {skipped_count} skipped (duplicates)")
+    finally:
+        session.close()
+
+
 COMMANDS = {
     "parse": cmd_parse,
     "save": cmd_save,
+    "fetch": cmd_fetch,
     "summary": cmd_summary,
 }
 
@@ -165,6 +205,7 @@ def main() -> None:
         print("Commands:")
         print("  parse   <pdf> [...]   Parse and display invoice PDFs")
         print("  save    <pdf> [...]   Parse and save invoices to database")
+        print("  fetch   [output_dir]  Fetch invoices from Gmail and save to DB")
         print("  summary [year]        Show earnings summary")
         sys.exit(1)
 
