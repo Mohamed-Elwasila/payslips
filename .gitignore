@@ -209,3 +209,7 @@ __marimo__/
 # Invoice PDFs (may contain personal data)
 *.pdf
 invoices/
+
+# Gmail API credentials (sensitive)
+credentials.json
+token.json
