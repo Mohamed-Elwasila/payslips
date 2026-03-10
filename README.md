@@ -10,18 +10,32 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Usage
-
-Parse a single invoice:
+### Database (PostgreSQL via Docker)
 
 ```bash
-python -m src.main path/to/invoice.pdf
+cp .env.example .env        # edit credentials if needed
+docker compose up -d         # start PostgreSQL
 ```
 
-Parse multiple invoices:
+## Usage
+
+Parse and display an invoice (no database):
 
 ```bash
-python -m src.main invoices/*.pdf
+python -m src.main parse path/to/invoice.pdf
+```
+
+Parse and save to database:
+
+```bash
+python -m src.main save path/to/invoice.pdf
+```
+
+View earnings summary:
+
+```bash
+python -m src.main summary         # all time
+python -m src.main summary 2026    # specific year
 ```
 
 ## Running Tests
@@ -29,10 +43,3 @@ python -m src.main invoices/*.pdf
 ```bash
 python -m pytest tests/ -v
 ```
-
-## Roadmap
-
-- [x] Phase 1: PDF parser (extract invoice data from Deliveroo PDFs)
-- [ ] Phase 2: PostgreSQL storage (persist data, query totals)
-- [ ] Phase 3: Gmail integration (auto-fetch invoice attachments)
-- [ ] Phase 4: Weekly automation + yearly reporting
