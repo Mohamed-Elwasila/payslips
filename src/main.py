@@ -2,8 +2,9 @@
 CLI entry point for the Deliveroo payslip parser.
 
 Usage:
-    python src/main.py <path-to-pdf>
-    python src/main.py invoices/*.pdf
+    python -m src.main parse <path-to-pdf> [<path-to-pdf> ...]
+    python -m src.main save <path-to-pdf> [<path-to-pdf> ...]
+    python -m src.main summary [year]
 """
 
 import sys
@@ -46,15 +47,16 @@ def print_invoice(pdf_path: str) -> None:
     print()
 
 
-def main() -> None:
-    if len(sys.argv) < 2:
-        print("Usage: python -m src.main <path-to-pdf> [<path-to-pdf> ...]")
-        sys.exit(1)
+def cmd_parse(args: list[str]) -> None:
+    """Parse and display PDFs (no database)."""
+    if not args:
+        print("Usage: python -m src.main parse <path-to-pdf> [...]")
+        return
 
     total_earnings = 0.0
     invoice_count = 0
 
-    for pdf_path in sys.argv[1:]:
+    for pdf_path in args:
         print_invoice(pdf_path)
         try:
             invoice = parse_pdf(pdf_path)
@@ -67,6 +69,107 @@ def main() -> None:
         print(f"{'=' * 50}")
         print(f"Total across {invoice_count} invoices: £{total_earnings:.2f}")
         print(f"{'=' * 50}")
+
+
+def cmd_save(args: list[str]) -> None:
+    """Parse PDFs and save to the database."""
+    if not args:
+        print("Usage: python -m src.main save <path-to-pdf> [...]")
+        return
+
+    from src.db import get_session, init_db, save_invoice
+
+    init_db()
+    session = get_session()
+
+    try:
+        for pdf_path in args:
+            path = Path(pdf_path)
+            if not path.exists():
+                print(f"Skipping: File not found: {pdf_path}")
+                continue
+            if not path.suffix.lower() == ".pdf":
+                print(f"Skipping: Not a PDF file: {pdf_path}")
+                continue
+
+            try:
+                invoice = parse_pdf(path)
+            except ValueError as e:
+                print(f"Skipping: Error parsing {pdf_path}: {e}")
+                continue
+
+            saved = save_invoice(session, invoice)
+            if saved:
+                print(f"Saved: {invoice.serial_number} ({invoice.grand_total:.2f})")
+            else:
+                print(f"Skipped (duplicate): {invoice.serial_number}")
+    finally:
+        session.close()
+
+
+def cmd_summary(args: list[str]) -> None:
+    """Show earnings summary from the database."""
+    from src.db import get_session, get_summary, get_yearly_total
+
+    session = get_session()
+
+    try:
+        year = int(args[0]) if args else None
+        rows = get_summary(session, year)
+
+        if not rows:
+            print("No invoices found in the database.")
+            return
+
+        month_names = [
+            "", "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ]
+
+        print(f"\n{'Month':<20} {'Invoices':<10} {'Earned':>10}")
+        print(f"{'-' * 20} {'-' * 10} {'-' * 10}")
+
+        for row in rows:
+            month_name = f"{month_names[row['month']]} {row['year']}"
+            print(
+                f"{month_name:<20} {row['invoice_count']:<10} "
+                f"£{row['total_earned']:>9.2f}"
+            )
+
+        # Yearly total
+        if year:
+            total = get_yearly_total(session, year)
+            print(f"\n{'=' * 42}")
+            print(f"Total for {year}: £{total:.2f}")
+            print(f"{'=' * 42}")
+        else:
+            grand = sum(r["total_earned"] for r in rows)
+            print(f"\n{'=' * 42}")
+            print(f"Grand total: £{grand:.2f}")
+            print(f"{'=' * 42}")
+    finally:
+        session.close()
+
+
+COMMANDS = {
+    "parse": cmd_parse,
+    "save": cmd_save,
+    "summary": cmd_summary,
+}
+
+
+def main() -> None:
+    if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
+        print("Usage: python -m src.main <command> [args]")
+        print()
+        print("Commands:")
+        print("  parse   <pdf> [...]   Parse and display invoice PDFs")
+        print("  save    <pdf> [...]   Parse and save invoices to database")
+        print("  summary [year]        Show earnings summary")
+        sys.exit(1)
+
+    command = sys.argv[1]
+    COMMANDS[command](sys.argv[2:])
 
 
 if __name__ == "__main__":
