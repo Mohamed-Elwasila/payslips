@@ -17,6 +17,15 @@ cp .env.example .env        # edit credentials if needed
 docker compose up -d         # start PostgreSQL
 ```
 
+### Gmail API (for auto-fetching invoices)
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a project (or use existing)
+3. Enable the **Gmail API**
+4. Go to Credentials > Create Credentials > OAuth 2.0 Client ID (Desktop app)
+5. Download the JSON and save as `credentials.json` in the project root
+6. On first run, a browser window will open for authentication
+
 ## Usage
 
 Parse and display an invoice (no database):
@@ -29,6 +38,13 @@ Parse and save to database:
 
 ```bash
 python -m src.main save path/to/invoice.pdf
+```
+
+Fetch invoices from Gmail, parse, and save to database:
+
+```bash
+python -m src.main fetch
+python -m src.main fetch ./my_invoices   # save PDFs to a specific folder
 ```
 
 View earnings summary:
