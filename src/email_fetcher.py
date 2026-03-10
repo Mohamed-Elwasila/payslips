@@ -60,7 +60,7 @@ def search_deliveroo_emails(service, max_results: int = 50):
 
     Returns a list of message IDs.
     """
-    query = "from:noreply@deliveroo.co.uk subject:invoice has:attachment filename:pdf"
+    query = "from:deliveroo subject:invoice has:attachment filename:pdf"
     results = service.users().messages().list(
         userId="me", q=query, maxResults=max_results
     ).execute()
@@ -108,8 +108,7 @@ def download_pdf_attachments(service, message_id: str, output_dir: str) -> list[
 
 def fetch_invoices(output_dir: str = None, max_results: int = 50) -> list[str]:
     """
-    High-level function: authenticate, search for Deliveroo emails,
-    download all PDF attachments.
+    authenticate, search for Deliveroo emails, download all PDF attachments.
 
     Returns a list of downloaded PDF file paths.
     """
