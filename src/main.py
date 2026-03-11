@@ -108,46 +108,75 @@ def cmd_save(args: list[str]) -> None:
         session.close()
 
 
+def _print_summary_table(rows, title: str = None, total_label: str = None, total: float = None):
+    """Print a formatted summary table."""
+    month_names = [
+        "", "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+    ]
+
+    if title:
+        print(f"\n{title}")
+    print(f"\n{'Month':<20} {'Invoices':<10} {'Earned':>10}")
+    print(f"{'-' * 20} {'-' * 10} {'-' * 10}")
+
+    for row in rows:
+        month_name = f"{month_names[row['month']]} {row['year']}"
+        print(
+            f"{month_name:<20} {row['invoice_count']:<10} "
+            f"£{row['total_earned']:>9.2f}"
+        )
+
+    if total is not None and total_label:
+        print(f"\n{'=' * 42}")
+        print(f"{total_label}: £{total:.2f}")
+        print(f"{'=' * 42}")
+
+
 def cmd_summary(args: list[str]) -> None:
     """Show earnings summary from the database."""
-    from src.db import get_session, get_summary, get_yearly_total
+    from src.db import (
+        get_session, get_summary, get_yearly_total,
+        get_summary_by_tax_year, get_tax_year_total,
+    )
 
     session = get_session()
 
     try:
-        year = int(args[0]) if args else None
-        rows = get_summary(session, year)
+        tax_mode = "--tax" in args
+        filtered_args = [a for a in args if a != "--tax"]
+        year = int(filtered_args[0]) if filtered_args else None
 
-        if not rows:
-            print("No invoices found in the database.")
-            return
+        if tax_mode:
+            if not year:
+                print("Usage: python -m src.main summary --tax <start_year>")
+                print("Example: python -m src.main summary --tax 2025  (tax year 2025/2026)")
+                return
 
-        month_names = [
-            "", "January", "February", "March", "April", "May", "June",
-            "July", "August", "September", "October", "November", "December",
-        ]
+            rows = get_summary_by_tax_year(session, year)
+            if not rows:
+                print(f"No invoices found for tax year {year}/{year + 1}.")
+                return
 
-        print(f"\n{'Month':<20} {'Invoices':<10} {'Earned':>10}")
-        print(f"{'-' * 20} {'-' * 10} {'-' * 10}")
-
-        for row in rows:
-            month_name = f"{month_names[row['month']]} {row['year']}"
-            print(
-                f"{month_name:<20} {row['invoice_count']:<10} "
-                f"£{row['total_earned']:>9.2f}"
+            total = get_tax_year_total(session, year)
+            _print_summary_table(
+                rows,
+                title=f"Tax Year {year}/{year + 1} (6 Apr {year} - 5 Apr {year + 1})",
+                total_label=f"Total for tax year {year}/{year + 1}",
+                total=total,
             )
-
-        # Yearly total
-        if year:
-            total = get_yearly_total(session, year)
-            print(f"\n{'=' * 42}")
-            print(f"Total for {year}: £{total:.2f}")
-            print(f"{'=' * 42}")
         else:
-            grand = sum(r["total_earned"] for r in rows)
-            print(f"\n{'=' * 42}")
-            print(f"Grand total: £{grand:.2f}")
-            print(f"{'=' * 42}")
+            rows = get_summary(session, year)
+            if not rows:
+                print("No invoices found in the database.")
+                return
+
+            if year:
+                total = get_yearly_total(session, year)
+                _print_summary_table(rows, total_label=f"Total for {year}", total=total)
+            else:
+                grand = sum(r["total_earned"] for r in rows)
+                _print_summary_table(rows, total_label="Grand total", total=grand)
     finally:
         session.close()
 
@@ -206,7 +235,8 @@ def main() -> None:
         print("  parse   <pdf> [...]   Parse and display invoice PDFs")
         print("  save    <pdf> [...]   Parse and save invoices to database")
         print("  fetch   [output_dir]  Fetch invoices from Gmail and save to DB")
-        print("  summary [year]        Show earnings summary")
+        print("  summary [year]        Show earnings summary (calendar year)")
+        print("  summary --tax <year>  Show earnings by UK tax year")
         sys.exit(1)
 
     command = sys.argv[1]
