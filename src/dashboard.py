@@ -1,6 +1,7 @@
 """Streamlit dashboard for Deliveroo earnings."""
 
 import sys
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -15,12 +16,22 @@ from src.db import (
     get_yearly_total,
     get_tax_year_total,
     get_all_invoices,
+    _tax_year_dates,
 )
 
 MONTH_NAMES = [
     "", "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
 ]
+
+
+def get_tax_week(invoice_date, tax_year_start):
+    """Calculate UK tax week number (Week 1 starts 6 April)."""
+    delta = invoice_date - tax_year_start
+    if delta.days < 0:
+        return None
+    return delta.days // 7 + 1
+
 
 st.set_page_config(page_title="Deliveroo Earnings", layout="wide")
 st.title("Deliveroo Earnings Dashboard")
@@ -74,7 +85,7 @@ try:
     if rows:
         df = pd.DataFrame(rows)
         df["month_label"] = df.apply(
-            lambda r: f"{MONTH_NAMES[r['month']]} {int(r['year'])}", axis=1
+            lambda r: f"{MONTH_NAMES[int(r['month'])]} {int(r['year'])}", axis=1
         )
         chart_data = df.set_index("month_label")["total_earned"]
         st.bar_chart(chart_data)
@@ -84,7 +95,7 @@ try:
     if rows:
         table_df = pd.DataFrame(rows)
         table_df["Month"] = table_df.apply(
-            lambda r: f"{MONTH_NAMES[r['month']]} {int(r['year'])}", axis=1
+            lambda r: f"{MONTH_NAMES[int(r['month'])]} {int(r['year'])}", axis=1
         )
         table_df = table_df.rename(columns={
             "invoice_count": "Invoices",
@@ -102,6 +113,21 @@ try:
     invoices = get_all_invoices(session)
     if invoices:
         inv_df = pd.DataFrame(invoices)
+
+        # Add tax week column
+        inv_df["Tax Week"] = inv_df["invoice_date"].apply(lambda d: None)
+        for idx, row in inv_df.iterrows():
+            inv_date = row["invoice_date"]
+            # Determine which tax year this invoice falls in
+            if inv_date >= date(inv_date.year, 4, 6):
+                ty_start = date(inv_date.year, 4, 6)
+                ty_label = f"{inv_date.year}/{inv_date.year + 1}"
+            else:
+                ty_start = date(inv_date.year - 1, 4, 6)
+                ty_label = f"{inv_date.year - 1}/{inv_date.year}"
+            week = get_tax_week(inv_date, ty_start)
+            inv_df.at[idx, "Tax Week"] = f"W{week} ({ty_label})"
+
         inv_df = inv_df.rename(columns={
             "serial_number": "Serial Number",
             "period_start": "Period Start",
