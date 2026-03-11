@@ -167,3 +167,65 @@ def get_yearly_total(session, year: int) -> float:
     ).scalar()
 
     return float(result) if result else 0.0
+
+
+def _tax_year_dates(start_year: int):
+    """Return (start_date, end_date) for UK tax year starting in April.
+
+    Tax year 2025/2026 = 6 April 2025 to 5 April 2026.
+    """
+    from datetime import date
+    return date(start_year, 4, 6), date(start_year + 1, 4, 5)
+
+
+def get_summary_by_tax_year(session, start_year: int):
+    """Get earnings summary grouped by month for a UK tax year.
+
+    Tax year 2025/2026: pass start_year=2025.
+    Returns list of dicts with: year, month, invoice_count, total_earned.
+    """
+    from sqlalchemy import func, extract
+
+    tax_start, tax_end = _tax_year_dates(start_year)
+
+    query = session.query(
+        extract("year", InvoiceModel.invoice_date).label("year"),
+        extract("month", InvoiceModel.invoice_date).label("month"),
+        func.count(InvoiceModel.id).label("invoice_count"),
+        func.sum(InvoiceModel.grand_total).label("total_earned"),
+    ).filter(
+        InvoiceModel.invoice_date >= tax_start,
+        InvoiceModel.invoice_date <= tax_end,
+    ).group_by(
+        extract("year", InvoiceModel.invoice_date),
+        extract("month", InvoiceModel.invoice_date),
+    ).order_by(
+        extract("year", InvoiceModel.invoice_date),
+        extract("month", InvoiceModel.invoice_date),
+    )
+
+    results = []
+    for row in query.all():
+        results.append({
+            "year": int(row.year),
+            "month": int(row.month),
+            "invoice_count": row.invoice_count,
+            "total_earned": float(row.total_earned),
+        })
+    return results
+
+
+def get_tax_year_total(session, start_year: int) -> float:
+    """Get total earnings for a UK tax year."""
+    from sqlalchemy import func
+
+    tax_start, tax_end = _tax_year_dates(start_year)
+
+    result = session.query(
+        func.sum(InvoiceModel.grand_total)
+    ).filter(
+        InvoiceModel.invoice_date >= tax_start,
+        InvoiceModel.invoice_date <= tax_end,
+    ).scalar()
+
+    return float(result) if result else 0.0
