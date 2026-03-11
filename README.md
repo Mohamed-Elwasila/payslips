@@ -71,6 +71,14 @@ Add this line (update the path to your project):
 
 Logs are written to `logs/fetch.log`.
 
+## Dashboard
+
+Launch the Streamlit earnings dashboard:
+
+```bash
+streamlit run src/dashboard.py
+```
+
 ## Running Tests
 
 ```bash
