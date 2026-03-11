@@ -50,8 +50,9 @@ python -m src.main fetch ./my_invoices   # save PDFs to a specific folder
 View earnings summary:
 
 ```bash
-python -m src.main summary         # all time
-python -m src.main summary 2026    # specific year
+python -m src.main summary             # all time
+python -m src.main summary 2026        # calendar year 2026
+python -m src.main summary --tax 2025  # UK tax year 2025/2026 (6 Apr - 5 Apr)
 ```
 
 ## Running Tests

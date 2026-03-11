@@ -5,7 +5,10 @@ from datetime import date
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.db import Base, InvoiceModel, DeliveryModel, save_invoice, invoice_exists, get_summary
+from src.db import (
+    Base, InvoiceModel, DeliveryModel, save_invoice, invoice_exists,
+    get_summary, get_summary_by_tax_year, get_tax_year_total,
+)
 from src.parser import Invoice, Delivery
 
 
@@ -101,3 +104,67 @@ def test_get_summary_filters_by_year():
 
     rows = get_summary(session, year=2026)
     assert len(rows) == 1
+
+
+def _invoice_with_date(serial, invoice_date):
+    """Create an invoice with a specific date for tax year testing."""
+    return Invoice(
+        serial_number=serial,
+        period_start=invoice_date,
+        period_end=invoice_date,
+        invoice_date=invoice_date,
+        deliveries=[
+            Delivery(day="Monday", date=invoice_date, orders_delivered=1, total=10.00),
+        ],
+        deliveries_total=10.00,
+        adjustments=0.0,
+        tips=0.0,
+        grand_total=10.00,
+    )
+
+
+def test_get_summary_by_tax_year():
+    session = _get_test_session()
+
+    # Invoice in tax year 2025/2026 (after 6 April 2025)
+    save_invoice(session, _invoice_with_date("tax_1", date(2025, 5, 10)))
+    # Invoice in tax year 2025/2026 (before 5 April 2026)
+    save_invoice(session, _invoice_with_date("tax_2", date(2026, 3, 15)))
+    # Invoice outside tax year 2025/2026 (after 5 April 2026)
+    save_invoice(session, _invoice_with_date("tax_3", date(2026, 5, 1)))
+
+    rows = get_summary_by_tax_year(session, 2025)
+    assert len(rows) == 2
+    assert rows[0]["year"] == 2025
+    assert rows[0]["month"] == 5
+    assert rows[1]["year"] == 2026
+    assert rows[1]["month"] == 3
+
+
+def test_get_summary_by_tax_year_empty():
+    session = _get_test_session()
+    save_invoice(session, _invoice_with_date("tax_4", date(2026, 5, 1)))
+
+    rows = get_summary_by_tax_year(session, 2024)
+    assert len(rows) == 0
+
+
+def test_get_tax_year_total():
+    session = _get_test_session()
+    save_invoice(session, _invoice_with_date("tax_5", date(2025, 6, 1)))
+    save_invoice(session, _invoice_with_date("tax_6", date(2026, 1, 15)))
+    save_invoice(session, _invoice_with_date("tax_7", date(2026, 6, 1)))
+
+    total = get_tax_year_total(session, 2025)
+    assert total == 20.00
+
+
+def test_tax_year_boundary_dates():
+    session = _get_test_session()
+    # 5 April = last day of tax year 2024/2025
+    save_invoice(session, _invoice_with_date("boundary_1", date(2025, 4, 5)))
+    # 6 April = first day of tax year 2025/2026
+    save_invoice(session, _invoice_with_date("boundary_2", date(2025, 4, 6)))
+
+    assert get_tax_year_total(session, 2024) == 10.00
+    assert get_tax_year_total(session, 2025) == 10.00
