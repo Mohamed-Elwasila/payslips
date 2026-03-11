@@ -229,3 +229,25 @@ def get_tax_year_total(session, start_year: int) -> float:
     ).scalar()
 
     return float(result) if result else 0.0
+
+
+def get_all_invoices(session):
+    """Get all invoices ordered by date (newest first)."""
+    invoices = (
+        session.query(InvoiceModel)
+        .order_by(InvoiceModel.invoice_date.desc())
+        .all()
+    )
+    return [
+        {
+            "serial_number": inv.serial_number,
+            "period_start": inv.period_start,
+            "period_end": inv.period_end,
+            "invoice_date": inv.invoice_date,
+            "deliveries_total": inv.deliveries_total,
+            "tips": inv.tips,
+            "adjustments": inv.adjustments,
+            "grand_total": inv.grand_total,
+        }
+        for inv in invoices
+    ]
