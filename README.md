@@ -55,6 +55,22 @@ python -m src.main summary 2026        # calendar year 2026
 python -m src.main summary --tax 2025  # UK tax year 2025/2026 (6 Apr - 5 Apr)
 ```
 
+## Automation (Weekly Cron)
+
+To auto-fetch invoices every Monday at 9 AM:
+
+```bash
+crontab -e
+```
+
+Add this line (update the path to your project):
+
+```bash
+0 9 * * 1 /path/to/payslips/scripts/fetch_weekly.sh
+```
+
+Logs are written to `logs/fetch.log`.
+
 ## Running Tests
 
 ```bash

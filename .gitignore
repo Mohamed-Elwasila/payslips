@@ -213,3 +213,6 @@ invoices/
 # Gmail API credentials (sensitive)
 credentials.json
 token.json
+
+# Cron logs
+logs/
