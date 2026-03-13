@@ -20,7 +20,9 @@ from src.db import (
     get_summary_by_tax_year,
     get_tax_year_total,
     get_yearly_total,
+    init_db,
 )
+from src.importer import import_uploaded_pdfs, summarize_results
 
 MONTH_NAMES = [
     "", "January", "February", "March", "April", "May", "June",
@@ -121,14 +123,59 @@ def build_monthly_chart(rows):
     return (bars + trend).properties(height=160)
 
 
+def render_import_results():
+    """Render the latest import run if present."""
+    results = st.session_state.get("last_import_results", [])
+    if not results:
+        st.caption("No import run yet.")
+        return
+
+    summary = summarize_results(results)
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Saved", summary["saved"])
+    col2.metric("Duplicates", summary["duplicate"])
+    col3.metric("Parse Errors", summary["error"])
+    col4.metric("Invalid", summary["invalid"])
+
+    table_df = pd.DataFrame([
+        {
+            "File": result.source_name,
+            "Status": result.status.title(),
+            "Invoice": result.serial_number or "-",
+            "Total": f"£{result.total:,.2f}" if result.total is not None else "-",
+            "Message": result.message,
+        }
+        for result in results
+    ])
+    st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+
 st.set_page_config(page_title="Deliveroo Earnings", layout="wide")
 st.title("Deliveroo Earnings Dashboard")
 
+init_db()
 session = get_session()
 
 try:
     st.sidebar.header("Filters")
     view_mode = st.sidebar.radio("View by", ["Calendar Year", "Tax Year"])
+
+    st.sidebar.divider()
+    st.sidebar.subheader("Import PDFs")
+    uploaded_files = st.sidebar.file_uploader(
+        "Upload Deliveroo invoice PDFs",
+        type=["pdf"],
+        accept_multiple_files=True,
+    )
+    if st.sidebar.button("Import uploads", width="stretch"):
+        if uploaded_files:
+            st.session_state["last_import_results"] = import_uploaded_pdfs(
+                session,
+                uploaded_files,
+            )
+            st.rerun()
+        else:
+            st.sidebar.caption("Choose one or more PDF files first.")
 
     all_summary = get_summary(session)
     rows = []
@@ -169,7 +216,9 @@ try:
             total_label = f"Tax Year {selected_label}"
             invoices = get_invoices_by_tax_year(session, start_year)
 
-    overview_tab, invoices_tab = st.tabs(["Overview", "Invoices"])
+    overview_tab, invoices_tab, imports_tab = st.tabs(
+        ["Overview", "Invoices", "Imports"]
+    )
 
     with overview_tab:
         total_invoices = len(invoices)
@@ -221,6 +270,14 @@ try:
             st.dataframe(display_df, use_container_width=True, hide_index=True)
         else:
             st.caption("No invoices for the selected period.")
+
+    with imports_tab:
+        st.subheader("Latest Import Run", anchor=False)
+        render_import_results()
+        st.caption(
+            "Automation is available with the fetch script or the systemd timer files "
+            "in scripts/ for a server setup."
+        )
 
 finally:
     session.close()
