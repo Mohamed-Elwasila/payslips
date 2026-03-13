@@ -71,6 +71,22 @@ Add this line (update the path to your project):
 
 Logs are written to `logs/fetch.log`.
 
+## Automation (systemd on a mini PC/server)
+
+If you run this on your HP mini as a small server, you can use the included
+systemd unit files instead of cron:
+
+```bash
+sudo cp scripts/payslips-fetch.service /etc/systemd/system/
+sudo cp scripts/payslips-fetch.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now payslips-fetch.timer
+sudo systemctl list-timers | grep payslips
+```
+
+The example service uses `/home/mo7muj/dev/payslips`. Update that path if your
+project lives somewhere else.
+
 ## Dashboard
 
 Launch the Streamlit earnings dashboard:
@@ -78,6 +94,10 @@ Launch the Streamlit earnings dashboard:
 ```bash
 streamlit run src/dashboard.py
 ```
+
+Dashboard features:
+- Upload PDF invoices directly from the sidebar
+- See import results for saved, duplicate, invalid, and failed files
 
 ## Running Tests
 
