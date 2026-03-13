@@ -1,0 +1,13 @@
+[Unit]
+Description=Fetch Deliveroo invoices and save them to the database
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/mo7muj/dev/payslips
+Environment=PATH=/home/mo7muj/dev/payslips/venv/bin:/usr/bin:/bin
+ExecStart=/home/mo7muj/dev/payslips/venv/bin/python -m src.main fetch
+
+[Install]
+WantedBy=multi-user.target
