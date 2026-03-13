@@ -7,7 +7,8 @@ from sqlalchemy.orm import sessionmaker
 
 from src.db import (
     Base, InvoiceModel, DeliveryModel, save_invoice, invoice_exists,
-    get_summary, get_summary_by_tax_year, get_tax_year_total,
+    get_invoices_by_tax_year, get_invoices_by_year, get_summary,
+    get_summary_by_tax_year, get_tax_year_total,
 )
 from src.parser import Invoice, Delivery
 
@@ -168,3 +169,29 @@ def test_tax_year_boundary_dates():
 
     assert get_tax_year_total(session, 2024) == 10.00
     assert get_tax_year_total(session, 2025) == 10.00
+
+
+def test_get_invoices_by_tax_year():
+    session = _get_test_session()
+    save_invoice(session, _invoice_with_date("tax_list_1", date(2025, 4, 6)))
+    save_invoice(session, _invoice_with_date("tax_list_2", date(2026, 4, 5)))
+    save_invoice(session, _invoice_with_date("tax_list_3", date(2026, 4, 6)))
+
+    invoices = get_invoices_by_tax_year(session, 2025)
+
+    assert len(invoices) == 2
+    assert invoices[0]["serial_number"] == "tax_list_2"
+    assert invoices[1]["serial_number"] == "tax_list_1"
+
+
+def test_get_invoices_by_year():
+    session = _get_test_session()
+    save_invoice(session, _invoice_with_date("year_list_1", date(2025, 12, 1)))
+    save_invoice(session, _invoice_with_date("year_list_2", date(2026, 1, 1)))
+    save_invoice(session, _invoice_with_date("year_list_3", date(2025, 9, 1)))
+
+    invoices = get_invoices_by_year(session, 2025)
+
+    assert len(invoices) == 2
+    assert invoices[0]["serial_number"] == "year_list_1"
+    assert invoices[1]["serial_number"] == "year_list_3"
