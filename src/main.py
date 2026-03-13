@@ -11,6 +11,7 @@ Usage:
 import sys
 from pathlib import Path
 
+from src.importer import import_pdf_paths, summarize_results
 from src.parser import parse_pdf
 
 
@@ -78,32 +79,32 @@ def cmd_save(args: list[str]) -> None:
         print("Usage: python -m src.main save <path-to-pdf> [...]")
         return
 
-    from src.db import get_session, init_db, save_invoice
+    from src.db import get_session, init_db
 
     init_db()
     session = get_session()
 
     try:
-        for pdf_path in args:
-            path = Path(pdf_path)
-            if not path.exists():
-                print(f"Skipping: File not found: {pdf_path}")
-                continue
-            if not path.suffix.lower() == ".pdf":
-                print(f"Skipping: Not a PDF file: {pdf_path}")
-                continue
-
-            try:
-                invoice = parse_pdf(path)
-            except ValueError as e:
-                print(f"Skipping: Error parsing {pdf_path}: {e}")
-                continue
-
-            saved = save_invoice(session, invoice)
-            if saved:
-                print(f"Saved: {invoice.serial_number} ({invoice.grand_total:.2f})")
+        results = import_pdf_paths(session, args)
+        summary = summarize_results(results)
+        for result in results:
+            if result.status == "saved":
+                print(
+                    f"Saved: {result.serial_number} "
+                    f"({result.total:.2f})"
+                )
+            elif result.status == "duplicate":
+                print(f"Skipped (duplicate): {result.serial_number}")
             else:
-                print(f"Skipped (duplicate): {invoice.serial_number}")
+                print(f"Skipping: {result.source_name}: {result.message}")
+
+        print(
+            "\nDone: "
+            f"{summary['saved']} saved, "
+            f"{summary['duplicate']} duplicates, "
+            f"{summary['error']} parse errors, "
+            f"{summary['invalid']} invalid files"
+        )
     finally:
         session.close()
 
@@ -184,7 +185,7 @@ def cmd_summary(args: list[str]) -> None:
 def cmd_fetch(args: list[str]) -> None:
     """Fetch Deliveroo invoices from Gmail, parse, and save to database."""
     from src.email_fetcher import fetch_invoices
-    from src.db import get_session, init_db, save_invoice
+    from src.db import get_session, init_db
 
     output_dir = args[0] if args else None
     pdfs = fetch_invoices(output_dir=output_dir)
@@ -196,25 +197,26 @@ def cmd_fetch(args: list[str]) -> None:
     session = get_session()
 
     try:
-        saved_count = 0
-        skipped_count = 0
-
-        for pdf_path in pdfs:
-            try:
-                invoice = parse_pdf(pdf_path)
-            except ValueError as e:
-                print(f"Skipping: Error parsing {pdf_path}: {e}")
-                continue
-
-            saved = save_invoice(session, invoice)
-            if saved:
-                print(f"Saved: {invoice.serial_number} ({invoice.grand_total:.2f})")
-                saved_count += 1
+        results = import_pdf_paths(session, pdfs)
+        summary = summarize_results(results)
+        for result in results:
+            if result.status == "saved":
+                print(
+                    f"Saved: {result.serial_number} "
+                    f"({result.total:.2f})"
+                )
+            elif result.status == "duplicate":
+                print(f"Skipped (duplicate): {result.serial_number}")
             else:
-                print(f"Skipped (duplicate): {invoice.serial_number}")
-                skipped_count += 1
+                print(f"Skipping: {result.source_name}: {result.message}")
 
-        print(f"\nDone: {saved_count} saved, {skipped_count} skipped (duplicates)")
+        print(
+            "\nDone: "
+            f"{summary['saved']} saved, "
+            f"{summary['duplicate']} duplicates, "
+            f"{summary['error']} parse errors, "
+            f"{summary['invalid']} invalid files"
+        )
     finally:
         session.close()
 
