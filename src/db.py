@@ -251,3 +251,55 @@ def get_all_invoices(session):
         }
         for inv in invoices
     ]
+
+
+def get_invoices_by_tax_year(session, start_year: int):
+    """Get invoices for a UK tax year ordered by date (newest first)."""
+    tax_start, tax_end = _tax_year_dates(start_year)
+    invoices = (
+        session.query(InvoiceModel)
+        .filter(
+            InvoiceModel.invoice_date >= tax_start,
+            InvoiceModel.invoice_date <= tax_end,
+        )
+        .order_by(InvoiceModel.invoice_date.desc())
+        .all()
+    )
+    return [
+        {
+            "serial_number": inv.serial_number,
+            "period_start": inv.period_start,
+            "period_end": inv.period_end,
+            "invoice_date": inv.invoice_date,
+            "deliveries_total": inv.deliveries_total,
+            "tips": inv.tips,
+            "adjustments": inv.adjustments,
+            "grand_total": inv.grand_total,
+        }
+        for inv in invoices
+    ]
+
+
+def get_invoices_by_year(session, year: int):
+    """Get invoices for a calendar year ordered by date (newest first)."""
+    from sqlalchemy import extract
+
+    invoices = (
+        session.query(InvoiceModel)
+        .filter(extract("year", InvoiceModel.invoice_date) == year)
+        .order_by(InvoiceModel.invoice_date.desc())
+        .all()
+    )
+    return [
+        {
+            "serial_number": inv.serial_number,
+            "period_start": inv.period_start,
+            "period_end": inv.period_end,
+            "invoice_date": inv.invoice_date,
+            "deliveries_total": inv.deliveries_total,
+            "tips": inv.tips,
+            "adjustments": inv.adjustments,
+            "grand_total": inv.grand_total,
+        }
+        for inv in invoices
+    ]
