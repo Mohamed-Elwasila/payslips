@@ -434,7 +434,7 @@ try:
                 accept_multiple_files=True,
                 key="expense_receipts",
             )
-            submitted = st.form_submit_button("Save expense", width="stretch")
+            submitted = st.form_submit_button("Save expense", use_container_width=True)
 
             if submitted:
                 if not supplier.strip() or not description.strip() or amount <= 0:
