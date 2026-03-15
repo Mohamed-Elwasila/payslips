@@ -291,10 +291,17 @@ try:
                 expenses = get_expenses_by_year(session, selected_year)
                 total_label = str(selected_year)
         else:
-            tax_years = sorted(
-                set(y for y in range(min(available_years) - 1, max(available_years) + 1)),
-                reverse=True,
-            )
+            # Determine which tax years actually have data.
+            # An invoice in calendar year Y before April belongs to tax year (Y-1)/Y,
+            # an invoice in calendar year Y from April onwards belongs to tax year Y/(Y+1).
+            tax_year_set = set()
+            for r in all_summary:
+                y, m = int(r["year"]), int(r["month"])
+                if m >= 4:
+                    tax_year_set.add(y)
+                else:
+                    tax_year_set.add(y - 1)
+            tax_years = sorted(tax_year_set, reverse=True)
             tax_year_labels = [f"{y}/{y + 1}" for y in tax_years]
             selected_label = st.sidebar.selectbox("Tax Year", tax_year_labels)
             start_year = int(selected_label.split("/")[0])
