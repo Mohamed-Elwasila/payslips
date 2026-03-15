@@ -98,6 +98,8 @@ streamlit run src/dashboard.py
 Dashboard features:
 - Upload PDF invoices directly from the sidebar
 - See import results for saved, duplicate, invalid, and failed files
+- Track expenses with uploaded receipt files stored under `data/receipts/`
+- View income, expenses, and profit together by calendar year or tax year
 
 ## Running Tests
 
