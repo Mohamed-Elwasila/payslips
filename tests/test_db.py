@@ -2,6 +2,7 @@
 
 from datetime import date
 from types import SimpleNamespace
+from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -386,3 +387,19 @@ def test_store_receipt_file(tmp_path):
     stored_path = metadata["stored_path"]
     assert stored_path.endswith(".pdf")
     assert "2026/02" in stored_path
+
+    # Resolve the stored path and ensure the file exists under tmp_path
+    path_obj = Path(stored_path)
+    if not path_obj.is_absolute():
+        path_obj = tmp_path / path_obj
+
+    assert str(tmp_path) in str(path_obj)
+    assert path_obj.exists()
+
+    # Verify that the stored file contents match the uploaded buffer
+    with path_obj.open("rb") as f:
+        assert f.read() == b"test"
+
+    # Optionally verify that file_size metadata is propagated correctly
+    if "file_size" in metadata:
+        assert metadata["file_size"] == uploaded_file.size
