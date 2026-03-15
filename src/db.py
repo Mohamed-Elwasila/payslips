@@ -24,7 +24,7 @@ from sqlalchemy import (
     create_engine,
     func,
 )
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, selectinload
 
 load_dotenv()
 
@@ -415,6 +415,7 @@ def get_expenses(session):
     """Get all expenses ordered by date (newest first)."""
     expenses = (
         session.query(ExpenseModel)
+        .options(selectinload(ExpenseModel.receipts))
         .order_by(ExpenseModel.expense_date.desc(), ExpenseModel.id.desc())
         .all()
     )
@@ -427,6 +428,7 @@ def get_expenses_by_year(session, year: int):
 
     expenses = (
         session.query(ExpenseModel)
+        .options(selectinload(ExpenseModel.receipts))
         .filter(extract("year", ExpenseModel.expense_date) == year)
         .order_by(ExpenseModel.expense_date.desc(), ExpenseModel.id.desc())
         .all()
@@ -439,6 +441,7 @@ def get_expenses_by_tax_year(session, start_year: int):
     tax_start, tax_end = _tax_year_dates(start_year)
     expenses = (
         session.query(ExpenseModel)
+        .options(selectinload(ExpenseModel.receipts))
         .filter(
             ExpenseModel.expense_date >= tax_start,
             ExpenseModel.expense_date <= tax_end,
