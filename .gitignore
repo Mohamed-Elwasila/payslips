@@ -216,3 +216,6 @@ token.json
 
 # Cron logs
 logs/
+
+# Claude Code
+.claude/
