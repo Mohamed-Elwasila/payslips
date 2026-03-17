@@ -8,7 +8,7 @@ Type=oneshot
 # edit this path: replace /path/to/payslips with the path to your local checkout
 WorkingDirectory=/path/to/payslips
 Environment=PATH=/path/to/payslips/venv/bin:/usr/bin:/bin
-ExecStart=/path/to/payslips/venv/bin/python -m src.main fetch
+ExecStart=python -m src.main fetch
 
 [Install]
 WantedBy=multi-user.target
