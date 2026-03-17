@@ -5,9 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/home/mo7muj/dev/payslips
-Environment=PATH=/home/mo7muj/dev/payslips/venv/bin:/usr/bin:/bin
-ExecStart=/home/mo7muj/dev/payslips/venv/bin/python -m src.main fetch
+# edit this path: replace /path/to/payslips with the path to your local checkout
+WorkingDirectory=/path/to/payslips
+Environment=PATH=/path/to/payslips/venv/bin:/usr/bin:/bin
+ExecStart=python -m src.main fetch
 
 [Install]
 WantedBy=multi-user.target
