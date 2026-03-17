@@ -101,7 +101,7 @@ Dashboard features:
 - Track expenses with uploaded receipt files stored under `data/receipts/`
 - View income, expenses, and profit together by calendar year or tax year
 
-![Payslips dashboard](docs/Payslips.jpg)
+![Payslips dashboard](docs/Payslips-framed.jpg)
 
 ## Running Tests
 
