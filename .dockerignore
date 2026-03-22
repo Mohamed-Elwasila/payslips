@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+.git/
+.gitignore
+.env
+.env.example
+data/
+logs/
+docs/
+tests/
+scripts/
+token.json
+credentials.json
+*.md
