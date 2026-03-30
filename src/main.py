@@ -8,7 +8,9 @@ Usage:
     python -m src.main summary [year]
 """
 
+import os
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 from src.importer import import_pdf_paths, summarize_results
@@ -85,7 +87,7 @@ def cmd_save(args: list[str]) -> None:
     session = get_session()
 
     try:
-        results = import_pdf_paths(session, args)
+        results = import_pdf_paths(session, args, archive_root="data/invoices")
         summary = summarize_results(results)
         for result in results:
             if result.status == "saved":
@@ -97,6 +99,9 @@ def cmd_save(args: list[str]) -> None:
                 print(f"Skipped (duplicate): {result.serial_number}")
             else:
                 print(f"Skipping: {result.source_name}: {result.message}")
+
+        if any(result.archived_path for result in results):
+            print(f"Archived PDFs under: {Path('data/invoices').resolve()}")
 
         print(
             "\nDone: "
@@ -185,19 +190,44 @@ def cmd_summary(args: list[str]) -> None:
 def cmd_fetch(args: list[str]) -> None:
     """Fetch Deliveroo invoices from Gmail, parse, and save to database."""
     from src.email_fetcher import fetch_invoices
-    from src.db import get_session, init_db
+    from src.db import get_latest_invoice_date, get_session, init_db
 
     output_dir = args[0] if args else None
-    pdfs = fetch_invoices(output_dir=output_dir)
-
-    if not pdfs:
-        return
+    fetch_lookback_days = int(os.getenv("FETCH_LOOKBACK_DAYS", "35"))
+    latest_invoice_date = None
 
     init_db()
     session = get_session()
 
     try:
-        results = import_pdf_paths(session, pdfs)
+        latest_invoice_date = get_latest_invoice_date(session)
+    finally:
+        session.close()
+
+    after_date = None
+    if latest_invoice_date is not None:
+        after_date = latest_invoice_date - timedelta(days=fetch_lookback_days)
+        print(
+            "Searching Gmail for recent invoices "
+            f"after {after_date.isoformat()} "
+            f"(latest saved invoice: {latest_invoice_date.isoformat()})."
+        )
+    else:
+        print("No saved invoices yet. Searching Gmail for available Deliveroo invoices.")
+
+    pdfs = fetch_invoices(output_dir=output_dir, after_date=after_date)
+
+    if not pdfs:
+        return
+
+    session = get_session()
+
+    try:
+        results = import_pdf_paths(
+            session,
+            pdfs,
+            archive_root="data/invoices",
+        )
         summary = summarize_results(results)
         for result in results:
             if result.status == "saved":
@@ -209,6 +239,14 @@ def cmd_fetch(args: list[str]) -> None:
                 print(f"Skipped (duplicate): {result.serial_number}")
             else:
                 print(f"Skipping: {result.source_name}: {result.message}")
+
+        saved_or_archived = [
+            result.archived_path
+            for result in results
+            if result.archived_path is not None
+        ]
+        if saved_or_archived:
+            print(f"Archived PDFs under: {Path('data/invoices').resolve()}")
 
         print(
             "\nDone: "
