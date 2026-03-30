@@ -47,6 +47,10 @@ python -m src.main fetch
 python -m src.main fetch ./my_invoices   # save PDFs to a specific folder
 ```
 
+Imported invoice PDFs are archived under `data/invoices/YYYY/MM/` so they stay
+available for later tax records instead of only existing in a temporary fetch
+folder.
+
 View earnings summary:
 
 ```bash
@@ -70,6 +74,10 @@ Add this line (update the path to your project):
 ```
 
 Logs are written to `logs/fetch.log`.
+
+Automatic Gmail fetches only look back a rolling window from the newest saved
+invoice by default, so once you are up to date it stops rescanning old months.
+Set `FETCH_LOOKBACK_DAYS` if you want a wider or narrower window.
 
 ## Automation (systemd on a mini PC/server)
 
