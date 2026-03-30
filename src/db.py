@@ -277,6 +277,11 @@ def get_yearly_total(session, year: int) -> float:
     return float(result) if result else 0.0
 
 
+def get_latest_invoice_date(session):
+    """Return the newest invoice date saved in the database, if any."""
+    return session.query(func.max(InvoiceModel.invoice_date)).scalar()
+
+
 def _tax_year_dates(start_year: int):
     """Return (start_date, end_date) for UK tax year starting in April.
 
