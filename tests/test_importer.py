@@ -1,8 +1,9 @@
 """Tests for the shared invoice import workflow."""
 
+from datetime import date
 from pathlib import Path
 
-from src.importer import import_pdf_paths, summarize_results
+from src.importer import import_pdf_paths, import_uploaded_pdfs, summarize_results
 
 
 class DummySession:
@@ -85,6 +86,57 @@ def test_import_pdf_paths_parse_error(monkeypatch, tmp_path):
     assert len(results) == 1
     assert results[0].status == "error"
     assert results[0].message == "Could not parse invoice"
+
+
+def test_import_pdf_paths_archives_pdf(monkeypatch, tmp_path):
+    session = DummySession()
+    pdf_file = tmp_path / "invoice.pdf"
+    pdf_file.write_bytes(b"%PDF-1.4 archive me")
+    archive_root = tmp_path / "archive"
+
+    class Invoice:
+        serial_number = "ri_test_archive"
+        grand_total = 19.99
+        invoice_date = date(2026, 3, 24)
+
+    monkeypatch.setattr("src.importer.parse_pdf", lambda _: Invoice())
+    monkeypatch.setattr("src.importer.save_invoice", lambda _session, _invoice: True)
+
+    results = import_pdf_paths(session, [pdf_file], archive_root=archive_root)
+
+    archived_path = archive_root / "2026" / "03" / "ri_test_archive.pdf"
+    assert results[0].archived_path == str(archived_path)
+    assert archived_path.read_bytes() == b"%PDF-1.4 archive me"
+
+
+def test_import_uploaded_pdfs_archives_before_temp_cleanup(monkeypatch, tmp_path):
+    session = DummySession()
+    archive_root = tmp_path / "archive"
+
+    class UploadedFile:
+        name = "upload.pdf"
+
+        @staticmethod
+        def getbuffer():
+            return b"%PDF-1.4 from upload"
+
+    class Invoice:
+        serial_number = "ri_test_upload_archive"
+        grand_total = 8.5
+        invoice_date = date(2026, 3, 30)
+
+    monkeypatch.setattr("src.importer.parse_pdf", lambda _: Invoice())
+    monkeypatch.setattr("src.importer.save_invoice", lambda _session, _invoice: True)
+
+    results = import_uploaded_pdfs(
+        session,
+        [UploadedFile()],
+        archive_root=archive_root,
+    )
+
+    archived_path = archive_root / "2026" / "03" / "ri_test_upload_archive.pdf"
+    assert results[0].archived_path == str(archived_path)
+    assert archived_path.read_bytes() == b"%PDF-1.4 from upload"
 
 
 def test_summarize_results_counts_statuses():

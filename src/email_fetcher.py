@@ -15,6 +15,7 @@ Setup:
 import base64
 import os
 import tempfile
+from datetime import date
 from pathlib import Path
 
 from google.auth.transport.requests import Request
@@ -54,13 +55,19 @@ def get_gmail_service():
     return build("gmail", "v1", credentials=creds)
 
 
-def search_deliveroo_emails(service, max_results: int = 50):
+def search_deliveroo_emails(
+    service,
+    max_results: int = 50,
+    after_date: date | None = None,
+):
     """
     Search Gmail for Deliveroo invoice emails with PDF attachments.
 
     Returns a list of message IDs.
     """
     query = "from:deliveroo subject:invoice has:attachment filename:pdf"
+    if after_date is not None:
+        query = f"{query} after:{after_date.strftime('%Y/%m/%d')}"
     results = service.users().messages().list(
         userId="me", q=query, maxResults=max_results
     ).execute()
@@ -106,7 +113,11 @@ def download_pdf_attachments(service, message_id: str, output_dir: str) -> list[
     return downloaded
 
 
-def fetch_invoices(output_dir: str = None, max_results: int = 50) -> list[str]:
+def fetch_invoices(
+    output_dir: str = None,
+    max_results: int = 50,
+    after_date: date | None = None,
+) -> list[str]:
     """
     authenticate, search for Deliveroo emails, download all PDF attachments.
 
@@ -118,7 +129,11 @@ def fetch_invoices(output_dir: str = None, max_results: int = 50) -> list[str]:
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     service = get_gmail_service()
-    messages = search_deliveroo_emails(service, max_results)
+    messages = search_deliveroo_emails(
+        service,
+        max_results=max_results,
+        after_date=after_date,
+    )
 
     if not messages:
         print("No Deliveroo invoice emails found.")
