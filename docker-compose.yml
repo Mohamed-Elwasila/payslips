@@ -20,6 +20,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-payslips}:${POSTGRES_PASSWORD:-payslips_dev}@db:5432/${POSTGRES_DB:-payslips}
     ports:
       - "8501:8501"
+    volumes:
+      - ./data:/app/data
     depends_on:
       - db
 

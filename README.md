@@ -109,6 +109,21 @@ Dashboard features:
 - Track expenses with uploaded receipt files stored under `data/receipts/`
 - View income, expenses, and profit together by calendar year or tax year
 
+Docker Compose mounts the project's `data/` directory at `/app/data`, keeping
+archived invoices and receipts on the host when the app container is replaced.
+This directory is excluded from Git. Back it up alongside the PostgreSQL database.
+
+If an existing app container already contains invoices or receipts, copy them to
+the host **before** recreating it with this mount (run from the project root):
+
+```bash
+mkdir -p data
+docker cp payslips-app:/app/data/. ./data/
+docker compose up -d app
+```
+
+Skip the copy command for a fresh installation with no stored files.
+
 ![Payslips dashboard](docs/Payslips-framed.jpg)
 
 ## Running Tests
