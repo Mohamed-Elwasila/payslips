@@ -2,12 +2,112 @@
 
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
+
+import pytest
 
 from src.importer import import_pdf_paths, import_uploaded_pdfs, summarize_results
 
 
 class DummySession:
     """Placeholder session object for patched import tests."""
+
+
+def test_mixed_batch_continues_after_parse_error(monkeypatch, tmp_path):
+    bad_pdf = tmp_path / "bad.pdf"
+    good_pdf = tmp_path / "good.PDF"
+    bad_pdf.write_bytes(b"bad")
+    good_pdf.write_bytes(b"good")
+    invoice = SimpleNamespace(serial_number="valid", grand_total=12.34)
+    parse = Mock(side_effect=[ValueError("Invalid invoice"), invoice])
+    save = Mock(return_value=True)
+    monkeypatch.setattr("src.importer.parse_pdf", parse)
+    monkeypatch.setattr("src.importer.save_invoice", save)
+    session = DummySession()
+
+    results = import_pdf_paths(session, [tmp_path / "missing.pdf", bad_pdf, good_pdf])
+
+    assert [result.status for result in results] == ["invalid", "error", "saved"]
+    assert results[1].message == "Invalid invoice"
+    assert results[2].serial_number == "valid"
+    save.assert_called_once_with(session, invoice)
+
+
+@pytest.mark.parametrize("parse_error", [False, True])
+def test_uploaded_temp_file_is_removed(monkeypatch, tmp_path, parse_error):
+    parsed_paths = []
+    content = b"uploaded invoice"
+    upload = SimpleNamespace(name="invoice.pdf", getbuffer=lambda: content)
+
+    def parse(path):
+        parsed_paths.append(path)
+        assert path.read_bytes() == content
+        if parse_error:
+            raise ValueError("Invalid invoice")
+        return SimpleNamespace(serial_number="upload", grand_total=1.0)
+
+    save = Mock(return_value=True)
+    monkeypatch.setattr("src.importer.parse_pdf", parse)
+    monkeypatch.setattr("src.importer.save_invoice", save)
+
+    results = import_uploaded_pdfs(DummySession(), [upload], archive_root=None)
+
+    assert results[0].status == ("error" if parse_error else "saved")
+    assert len(parsed_paths) == 1
+    assert not parsed_paths[0].exists()
+    assert save.call_count == (0 if parse_error else 1)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="Importer overwrites the archive before checking for a duplicate",
+)
+def test_duplicate_preserves_original_archive(monkeypatch, tmp_path):
+    source = tmp_path / "invoice.pdf"
+    source.write_bytes(b"original invoice")
+    invoice = SimpleNamespace(
+        serial_number="same_invoice", grand_total=1.0, invoice_date=date(2026, 3, 24)
+    )
+    monkeypatch.setattr("src.importer.parse_pdf", lambda _: invoice)
+    monkeypatch.setattr("src.importer.save_invoice", Mock(side_effect=[True, False]))
+    session = DummySession()
+    archive = tmp_path / "archive"
+
+    first = import_pdf_paths(session, [source], archive_root=archive)[0]
+    source.write_bytes(b"different invoice with same serial")
+    second = import_pdf_paths(session, [source], archive_root=archive)[0]
+
+    assert first.status == "saved"
+    assert second.status == "duplicate"
+    assert Path(first.archived_path).read_bytes() == b"original invoice"
+
+
+@pytest.mark.parametrize("absolute", [False, True], ids=["parent-traversal", "absolute"])
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="Importer uses an unchecked invoice serial number as an archive path",
+)
+def test_unsafe_serial_cannot_overwrite_file_outside_archive(monkeypatch, tmp_path, absolute):
+    source = tmp_path / "invoice.pdf"
+    source.write_bytes(b"incoming invoice")
+    outside = tmp_path / "protected.pdf"
+    outside.write_bytes(b"keep this file")
+    serial = str(outside.with_suffix("")) if absolute else "../../../protected"
+    invoice = SimpleNamespace(
+        serial_number=serial, grand_total=1.0, invoice_date=date(2026, 3, 24)
+    )
+    monkeypatch.setattr("src.importer.parse_pdf", lambda _: invoice)
+    monkeypatch.setattr("src.importer.save_invoice", Mock(return_value=True))
+
+    try:
+        import_pdf_paths(DummySession(), [source], archive_root=tmp_path / "archive")
+    except ValueError:
+        pass  # Rejecting the unsafe serial is also an acceptable outcome.
+
+    assert outside.read_bytes() == b"keep this file"
 
 
 def test_import_pdf_paths_reports_missing_file(tmp_path):
