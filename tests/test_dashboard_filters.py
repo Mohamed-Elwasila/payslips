@@ -47,13 +47,7 @@ def test_empty_dashboard_renders_zero_totals(dashboard_db):
     assert [metric.value for metric in app.metric][:3] == ["£0.00"] * 3
 
 
-@pytest.mark.parametrize("day", [
-    pytest.param(5, marks=pytest.mark.xfail(
-        strict=True, raises=AssertionError,
-        reason="Dashboard assigns all April invoices to the following tax year",
-    )),
-    6,
-])
+@pytest.mark.parametrize("day", [5, 6])
 def test_april_boundary_is_available_in_tax_year_filter(dashboard_db, day):
     add_invoice(dashboard_db, date(2026, 4, day))
     app = run_dashboard()
@@ -68,10 +62,6 @@ def test_april_boundary_is_available_in_tax_year_filter(dashboard_db, day):
     assert app.metric[0].value == "£10.00"
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason="Calendar-year choices omit years containing only expenses",
-)
 def test_expense_only_year_is_selectable(dashboard_db):
     add_invoice(dashboard_db, date(2026, 2, 1))
     db.save_expense(
