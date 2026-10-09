@@ -68,11 +68,34 @@ def search_deliveroo_emails(
     query = "from:deliveroo subject:invoice has:attachment filename:pdf"
     if after_date is not None:
         query = f"{query} after:{after_date.strftime('%Y/%m/%d')}"
-    results = service.users().messages().list(
-        userId="me", q=query, maxResults=max_results
-    ).execute()
 
-    return results.get("messages", [])
+    messages = []
+    page_token = None
+    while True:
+        request_kwargs = {"userId": "me", "q": query, "maxResults": max_results}
+        if page_token is not None:
+            request_kwargs["pageToken"] = page_token
+
+        results = service.users().messages().list(**request_kwargs).execute()
+        messages.extend(results.get("messages", []))
+
+        page_token = results.get("nextPageToken")
+        if not page_token:
+            break
+
+    return messages
+
+
+def _flatten_parts(parts):
+    """Recursively flatten nested multipart MIME parts into a flat list."""
+    flattened = []
+    for part in parts:
+        nested_parts = part.get("parts")
+        if nested_parts:
+            flattened.extend(_flatten_parts(nested_parts))
+        else:
+            flattened.append(part)
+    return flattened
 
 
 def download_pdf_attachments(service, message_id: str, output_dir: str) -> list[str]:
@@ -87,7 +110,7 @@ def download_pdf_attachments(service, message_id: str, output_dir: str) -> list[
 
     downloaded = []
     payload = message.get("payload", {})
-    parts = payload.get("parts", [])
+    parts = _flatten_parts(payload.get("parts", []))
 
     for part in parts:
         filename = part.get("filename", "")
@@ -103,7 +126,7 @@ def download_pdf_attachments(service, message_id: str, output_dir: str) -> list[
         ).execute()
 
         file_data = base64.urlsafe_b64decode(attachment["data"])
-        file_path = os.path.join(output_dir, filename)
+        file_path = os.path.join(output_dir, f"{message_id}_{filename}")
 
         with open(file_path, "wb") as f:
             f.write(file_data)
