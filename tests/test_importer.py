@@ -59,11 +59,6 @@ def test_uploaded_temp_file_is_removed(monkeypatch, tmp_path, parse_error):
     assert save.call_count == (0 if parse_error else 1)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Importer overwrites the archive before checking for a duplicate",
-)
 def test_duplicate_preserves_original_archive(monkeypatch, tmp_path):
     source = tmp_path / "invoice.pdf"
     source.write_bytes(b"original invoice")
@@ -85,11 +80,6 @@ def test_duplicate_preserves_original_archive(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("absolute", [False, True], ids=["parent-traversal", "absolute"])
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Importer uses an unchecked invoice serial number as an archive path",
-)
 def test_unsafe_serial_cannot_overwrite_file_outside_archive(monkeypatch, tmp_path, absolute):
     source = tmp_path / "invoice.pdf"
     source.write_bytes(b"incoming invoice")
