@@ -2,6 +2,8 @@
 
 from datetime import date
 
+import pytest
+
 from src.parser import Delivery, Invoice, parse_invoice
 
 
@@ -101,3 +103,75 @@ def test_parse_multiple_orders_per_day():
     invoice = parse_invoice(text)
     assert invoice.deliveries[0].orders_delivered == 5
     assert invoice.deliveries[0].total == 22.75
+
+
+@pytest.mark.parametrize(
+    "prefix, message",
+    [
+        ("Invoice serial number:", "Could not find invoice serial number"),
+        ("Invoice period:", "Could not find invoice period"),
+        ("Invoice Date:", "Could not find invoice date"),
+        ("Total fee payable:", "Could not find total fee payable"),
+    ],
+)
+def test_missing_required_field_is_rejected(prefix, message):
+    text = "\n".join(
+        line for line in SAMPLE_TEXT.splitlines() if not line.startswith(prefix)
+    )
+
+    with pytest.raises(ValueError, match=message):
+        parse_invoice(text)
+
+
+@pytest.mark.parametrize("text", ["", "   \n", "Unrelated document"])
+def test_non_invoice_text_is_rejected(text):
+    with pytest.raises(ValueError, match="Could not find invoice serial number"):
+        parse_invoice(text)
+
+
+def test_impossible_invoice_date_is_rejected():
+    text = SAMPLE_TEXT.replace("Invoice Date: 24 February 2026", "Invoice Date: 30 February 2026")
+
+    with pytest.raises(ValueError):
+        parse_invoice(text)
+
+
+def test_thousands_separators_in_amounts():
+    text = SAMPLE_TEXT.replace("£4.51", "£1,004.51").replace("£7.90", "£1,007.90")
+
+    invoice = parse_invoice(text)
+
+    assert invoice.deliveries[0].total == 1004.51
+    assert invoice.deliveries_total == 1007.90
+    assert invoice.grand_total == 1007.90
+
+
+@pytest.mark.parametrize("amount", ["-£2.00", "£-2.00"])
+def test_negative_adjustments_preserve_sign(amount):
+    text = SAMPLE_TEXT.replace(
+        "Adjustments -- --", f"Adjustments {amount} {amount}"
+    ).replace("Total £7.90 £7.90", "Total £5.90 £5.90").replace(
+        "Total fee payable: £7.90", "Total fee payable: £5.90"
+    )
+
+    invoice = parse_invoice(text)
+
+    assert invoice.adjustments == -2.0
+    assert invoice.grand_total == 5.90
+
+
+def test_missing_deliveries_subtotal_is_rejected():
+    text = SAMPLE_TEXT.replace("Deliveries £7.90 £7.90\n", "")
+
+    with pytest.raises(ValueError):
+        parse_invoice(text)
+
+
+def test_reversed_invoice_period_is_rejected():
+    text = SAMPLE_TEXT.replace(
+        "Invoice period: 17 February 2026 - 21 February 2026",
+        "Invoice period: 21 February 2026 - 17 February 2026",
+    )
+
+    with pytest.raises(ValueError):
+        parse_invoice(text)
