@@ -121,9 +121,15 @@ def _archive_invoice_pdf(
     root = Path(archive_root)
     subdir = root / str(invoice.invoice_date.year) / f"{invoice.invoice_date.month:02d}"
     subdir.mkdir(parents=True, exist_ok=True)
-    archived_path = subdir / f"{invoice.serial_number}.pdf"
+    archived_path = (subdir / f"{invoice.serial_number}.pdf").resolve()
 
-    if pdf_path.resolve() != archived_path.resolve():
+    if not archived_path.is_relative_to(subdir.resolve()):
+        raise ValueError(f"Unsafe invoice serial number: {invoice.serial_number!r}")
+
+    if archived_path.exists():
+        return str(archived_path)
+
+    if pdf_path.resolve() != archived_path:
         shutil.copy2(pdf_path, archived_path)
 
     return str(archived_path)
