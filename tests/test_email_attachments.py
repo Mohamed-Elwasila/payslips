@@ -4,8 +4,6 @@ import base64
 from pathlib import Path
 from unittest.mock import Mock
 
-import pytest
-
 from src.email_fetcher import download_pdf_attachments, search_deliveroo_emails
 
 
@@ -38,7 +36,6 @@ def test_download_pdf_and_ignore_non_pdf(tmp_path):
     )
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="Search ignores nextPageToken")
 def test_search_reads_next_page():
     service = Mock()
     request = service.users.return_value.messages.return_value.list
@@ -50,7 +47,6 @@ def test_search_reads_next_page():
     assert request.call_args.kwargs["pageToken"] == "next"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="Nested MIME parts are ignored")
 def test_nested_pdf_is_downloaded(tmp_path):
     service = service_with_parts([{"parts": [
         {"filename": "invoice.pdf", "body": {"attachmentId": "pdf"}}
@@ -60,7 +56,6 @@ def test_nested_pdf_is_downloaded(tmp_path):
     assert Path(paths[0]).read_bytes() == b"invoice bytes"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="Same-name attachments overwrite each other")
 def test_same_filename_from_two_messages_is_preserved(tmp_path):
     service = service_with_parts([
         {"filename": "invoice.pdf", "body": {"attachmentId": "pdf"}}
