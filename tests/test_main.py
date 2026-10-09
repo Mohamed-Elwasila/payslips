@@ -6,7 +6,6 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from pdfminer.pdfparser import PDFSyntaxError
 
 from src import main
 
@@ -91,12 +90,6 @@ def test_print_invoice_formats_full_invoice(monkeypatch, capsys, tmp_path):
     assert "£   7.90" in out
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=PDFSyntaxError,
-    reason="print_invoice only catches ValueError, so a corrupt .pdf crashes with "
-    "an uncaught PDFSyntaxError instead of printing a clean parse error",
-)
 def test_print_invoice_corrupt_pdf_prints_clean_error(capsys, tmp_path):
     corrupt = tmp_path / "corrupt.pdf"
     corrupt.write_bytes(b"this is not a real pdf file")
@@ -393,12 +386,6 @@ def test_cmd_summary_tax_mode_with_records(monkeypatch, capsys):
     assert "Total for tax year 2025/2026: £8.50" in out
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=ValueError,
-    reason="cmd_summary does not validate the year argument and crashes with an "
-    "uncaught ValueError instead of printing a usage error for non-numeric input",
-)
 def test_cmd_summary_non_numeric_year_prints_usage_error(monkeypatch, capsys):
     _patch_db_summary(monkeypatch)
 
@@ -505,12 +492,6 @@ def test_cmd_fetch_no_pdfs_found_skips_second_session(monkeypatch, capsys):
     get_session.assert_called_once()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FileNotFoundError,
-    reason="cmd_fetch does not catch missing Gmail credentials and crashes with an "
-    "uncaught FileNotFoundError instead of printing a clean setup error",
-)
 def test_cmd_fetch_missing_credentials_prints_clean_error(monkeypatch, capsys):
     session1 = DummySession()
     _patch_db_fetch(monkeypatch, sessions=[session1], latest_invoice_date=None)
