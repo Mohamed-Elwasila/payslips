@@ -268,7 +268,10 @@ try:
     total_label = "No data yet"
 
     if all_summary:
-        available_years = sorted(set(r["year"] for r in all_summary))
+        # Union invoice years with expense years so a year containing only
+        # expenses (no invoices) still shows up as a filter option.
+        expense_years = set(r["year"] for r in get_expense_summary(session))
+        available_years = sorted(set(r["year"] for r in all_summary) | expense_years)
 
         if view_mode == "Calendar Year":
             selected_year = st.sidebar.selectbox("Year", ["All"] + available_years)
@@ -291,16 +294,14 @@ try:
                 expenses = get_expenses_by_year(session, selected_year)
                 total_label = str(selected_year)
         else:
-            # Determine which tax years actually have data.
-            # An invoice in calendar year Y before April belongs to tax year (Y-1)/Y,
-            # an invoice in calendar year Y from April onwards belongs to tax year Y/(Y+1).
-            tax_year_set = set()
-            for r in all_summary:
-                y, m = int(r["year"]), int(r["month"])
-                if m >= 4:
-                    tax_year_set.add(y)
-                else:
-                    tax_year_set.add(y - 1)
+            # Determine which tax years actually have data. Derive this from
+            # the actual invoice dates (not the monthly summary) so the 6
+            # April boundary is honoured precisely instead of treating all
+            # of April as the start of the next tax year.
+            tax_year_set = {
+                int(get_invoice_tax_year(inv["invoice_date"])[0].split("/")[0])
+                for inv in get_all_invoices(session)
+            }
             tax_years = sorted(tax_year_set, reverse=True)
             tax_year_labels = [f"{y}/{y + 1}" for y in tax_years]
             selected_label = st.sidebar.selectbox("Tax Year", tax_year_labels)
