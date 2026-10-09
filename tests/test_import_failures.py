@@ -26,10 +26,6 @@ def pdf_paths(tmp_path):
     return paths
 
 
-@pytest.mark.xfail(
-    strict=True, raises=SQLAlchemyError,
-    reason="Database save failures escape the batch without rollback",
-)
 def test_database_failure_rolls_back_and_continues(monkeypatch, pdf_paths, invoice):
     session = Mock()
     monkeypatch.setattr(importer, "parse_pdf", Mock(return_value=invoice))
@@ -51,10 +47,6 @@ def test_database_failure_rolls_back_and_continues(monkeypatch, pdf_paths, invoi
     session.rollback.assert_called_once_with()
 
 
-@pytest.mark.xfail(
-    strict=True, raises=PermissionError,
-    reason="Archive write failures abort the entire batch",
-)
 def test_archive_failure_does_not_save_failed_invoice(monkeypatch, tmp_path, pdf_paths, invoice):
     monkeypatch.setattr(importer, "parse_pdf", Mock(return_value=invoice))
     monkeypatch.setattr(importer, "_archive_invoice_pdf", Mock(side_effect=[
@@ -71,10 +63,6 @@ def test_archive_failure_does_not_save_failed_invoice(monkeypatch, tmp_path, pdf
     save.assert_called_once_with(session, invoice)
 
 
-@pytest.mark.xfail(
-    strict=True, raises=PDFSyntaxError,
-    reason="Malformed PDF exceptions escape the importer",
-)
 def test_corrupt_pdf_does_not_stop_next_import(monkeypatch, pdf_paths, invoice):
     actual_parse = importer.parse_pdf
 
