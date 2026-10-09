@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from pdfminer.pdfparser import PDFSyntaxError
+from sqlalchemy.exc import SQLAlchemyError
+
 from src.db import save_invoice
 from src.parser import parse_pdf
 
@@ -138,7 +141,7 @@ def _import_single_path(
     """Parse a single PDF path and save it to the database."""
     try:
         invoice = parse_pdf(pdf_path)
-    except (ValueError, FileNotFoundError) as exc:
+    except (ValueError, FileNotFoundError, PDFSyntaxError) as exc:
         return ImportItemResult(
             source_name=source_name,
             status="error",
@@ -147,9 +150,25 @@ def _import_single_path(
 
     archived_path = None
     if archive_root is not None:
-        archived_path = _archive_invoice_pdf(pdf_path, invoice, archive_root)
+        try:
+            archived_path = _archive_invoice_pdf(pdf_path, invoice, archive_root)
+        except OSError as exc:
+            return ImportItemResult(
+                source_name=source_name,
+                status="error",
+                message=str(exc),
+            )
 
-    saved = save_invoice(session, invoice)
+    try:
+        saved = save_invoice(session, invoice)
+    except SQLAlchemyError as exc:
+        session.rollback()
+        return ImportItemResult(
+            source_name=source_name,
+            status="error",
+            message=str(exc),
+        )
+
     if saved:
         return ImportItemResult(
             source_name=source_name,
