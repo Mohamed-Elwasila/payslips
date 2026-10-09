@@ -66,6 +66,8 @@ def parse_invoice(text: str) -> Invoice:
         raise ValueError("Could not find invoice period")
     period_start = _parse_date(period_match.group(1))
     period_end = _parse_date(period_match.group(2))
+    if period_end < period_start:
+        raise ValueError("Invoice period end date is before start date")
 
     # Invoice date
     date_match = re.search(r"Invoice Date:\s*(\d{1,2} \w+ \d{4})", text)
@@ -96,17 +98,18 @@ def parse_invoice(text: str) -> Invoice:
     deliveries_total_match = re.search(
         r"Deliveries\s+£([\d,]+\.\d{2})\s+£([\d,]+\.\d{2})", text
     )
-    deliveries_total = 0.0
-    if deliveries_total_match:
-        deliveries_total = float(
-            deliveries_total_match.group(1).replace(",", "")
-        )
+    if not deliveries_total_match:
+        raise ValueError("Could not find deliveries subtotal")
+    deliveries_total = float(
+        deliveries_total_match.group(1).replace(",", "")
+    )
 
     # Adjustments
     adjustments = 0.0
-    adj_match = re.search(r"Adjustments\s+£([\d,]+\.\d{2})", text)
+    adj_match = re.search(r"Adjustments\s+(-?)£(-?)([\d,]+\.\d{2})", text)
     if adj_match:
-        adjustments = float(adj_match.group(1).replace(",", ""))
+        sign = -1 if "-" in (adj_match.group(1), adj_match.group(2)) else 1
+        adjustments = sign * float(adj_match.group(3).replace(",", ""))
 
     # Tips
     tips = 0.0
