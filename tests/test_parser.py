@@ -147,11 +147,6 @@ def test_thousands_separators_in_amounts():
 
 
 @pytest.mark.parametrize("amount", ["-£2.00", "£-2.00"])
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="Negative adjustments are silently parsed as zero",
-)
 def test_negative_adjustments_preserve_sign(amount):
     text = SAMPLE_TEXT.replace(
         "Adjustments -- --", f"Adjustments {amount} {amount}"
@@ -165,11 +160,6 @@ def test_negative_adjustments_preserve_sign(amount):
     assert invoice.grand_total == 5.90
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=pytest.fail.Exception,
-    reason="A missing deliveries subtotal is silently parsed as zero",
-)
 def test_missing_deliveries_subtotal_is_rejected():
     text = SAMPLE_TEXT.replace("Deliveries £7.90 £7.90\n", "")
 
@@ -177,11 +167,6 @@ def test_missing_deliveries_subtotal_is_rejected():
         parse_invoice(text)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=pytest.fail.Exception,
-    reason="Parser accepts an invoice period with the end before the start",
-)
 def test_reversed_invoice_period_is_rejected():
     text = SAMPLE_TEXT.replace(
         "Invoice period: 17 February 2026 - 21 February 2026",
