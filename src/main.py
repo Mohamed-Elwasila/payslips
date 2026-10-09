@@ -13,6 +13,8 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
+from pdfminer.pdfparser import PDFSyntaxError
+
 from src.importer import import_pdf_paths, summarize_results
 from src.parser import parse_pdf
 
@@ -29,7 +31,7 @@ def print_invoice(pdf_path: str) -> None:
 
     try:
         invoice = parse_pdf(path)
-    except ValueError as e:
+    except (ValueError, PDFSyntaxError) as e:
         print(f"Error parsing {pdf_path}: {e}")
         return
 
@@ -151,7 +153,15 @@ def cmd_summary(args: list[str]) -> None:
     try:
         tax_mode = "--tax" in args
         filtered_args = [a for a in args if a != "--tax"]
-        year = int(filtered_args[0]) if filtered_args else None
+        if filtered_args:
+            try:
+                year = int(filtered_args[0])
+            except ValueError:
+                print(f"Error: Invalid year: {filtered_args[0]!r}")
+                print("Usage: python -m src.main summary [--tax] [year]")
+                return
+        else:
+            year = None
 
         if tax_mode:
             if not year:
@@ -215,7 +225,11 @@ def cmd_fetch(args: list[str]) -> None:
     else:
         print("No saved invoices yet. Searching Gmail for available Deliveroo invoices.")
 
-    pdfs = fetch_invoices(output_dir=output_dir, after_date=after_date)
+    try:
+        pdfs = fetch_invoices(output_dir=output_dir, after_date=after_date)
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        return
 
     if not pdfs:
         return

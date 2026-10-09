@@ -181,12 +181,6 @@ def test_build_invoice_display_df_multiple_invoices_preserves_order_and_rows(das
     assert df["Tax Year"].tolist() == ["2025/2026", "2025/2026", "2025/2026"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=KeyError,
-    reason="build_invoice_display_df lacks the empty-list guard that build_expense_display_df has, "
-    "so pd.DataFrame([]) has no invoice_date column and .apply() raises KeyError",
-)
 def test_build_invoice_display_df_empty_list_returns_empty_dataframe(dashboard):
     df = dashboard.build_invoice_display_df([])
 

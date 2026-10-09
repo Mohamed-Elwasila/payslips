@@ -78,6 +78,9 @@ def format_month_label(year, month):
 
 def build_invoice_display_df(invoices):
     """Prepare invoice rows for display."""
+    if not invoices:
+        return pd.DataFrame()
+
     inv_df = pd.DataFrame(invoices)
     inv_df["Tax Year"] = inv_df["invoice_date"].apply(
         lambda d: get_invoice_tax_year(d)[0]
